@@ -44,6 +44,7 @@ SWEP.Secondary.Automatic = false
 SWEP.MaxHeal = 90
 
 local INI_SEF = false
+local INI_VIVO = false
 local ID_WEAPON = "weapon_eft_grizzly"
 local ID_PRIMARYAMMO = "grizzlykit"
 
@@ -53,8 +54,11 @@ function SWEP:Initialize()
 	local FilePathSEF = "lua/SEF/SEF_Functions.lua"
     if file.Exists(FilePathSEF, "GAME") then
         INI_SEF = true
-    else
-        INI_SEF = false
+    end
+	
+	local FilePathVIVO = "lua/autorun/ojsshared.lua"
+    if file.Exists(FilePathVIVO, "GAME") then
+        INI_VIVO = true
     end
 end 
 
@@ -69,9 +73,9 @@ function SWEP:Deploy()
 	
 	self:SendWeaponAnim(ACT_VM_IDLE)
 	
-	if owner:GetAmmoCount(self.Primary.Ammo) == 0 then owner:StripWeapon(ID_WEAPON) end
-	if GetConVar("cl_eftmeds_quick"):GetBool() then
-		self:PrimaryAttack()
+	if owner:GetAmmoCount(self.Primary.Ammo) == 0 then 
+		owner:StripWeapon(ID_WEAPON)
+		owner:SelectWeapon(owner:GetPreviousWeapon())
 	end
 	return true
 end
@@ -82,35 +86,35 @@ function SWEP:Heal(owner)
 	local VarGetHealth = math.min(VarMissingHealth, owner:GetAmmoCount(ID_PRIMARYAMMO))
 	local VarHealHealth = math.min(VarGetHealth, self.MaxHeal) 
 	
-	if IsValid(self) then
-		if IsValid(owner) and SERVER and owner:GetActiveWeapon():GetClass() == ID_WEAPON then -- Heal logic
-			if INI_SEF == true then
-			
-				-- owner:ApplyEffect("Healing", 1, VarHealHealth, 1)
-				-- owner:RemoveEffect("Exposed")
-				
-				if owner:HaveEffect("Bleeding") then
-					owner:RemoveEffect("Bleeding")
-					owner:RemoveAmmo(40, ID_PRIMARYAMMO)    
-				end	
-				if owner:HaveEffect("Fatigue") then
-					owner:RemoveEffect("Fatigue")
-					owner:SoftRemoveEffect("Fatigue")
-					owner:RemoveAmmo(50, ID_PRIMARYAMMO)    
-				end	
-				owner:RemoveEffect("Concussion")
-			end
-			owner:SetHealth(math.min(owner:GetMaxHealth(), owner:Health() + VarHealHealth))
-			owner:RemoveAmmo(VarHealHealth, ID_PRIMARYAMMO)  
+	if IsValid(owner) and SERVER and owner:GetActiveWeapon():GetClass() == ID_WEAPON then
+		if INI_SEF == true then
+			if owner:HaveEffect("Bleeding") then
+				owner:RemoveEffect("Bleeding")
+				owner:RemoveAmmo(40, ID_PRIMARYAMMO)    
+			end	
+			if owner:HaveEffect("Fatigue") then
+				owner:RemoveEffect("Fatigue")
+				owner:SoftRemoveEffect("Fatigue")
+				owner:RemoveAmmo(50, ID_PRIMARYAMMO)    
+			end	
+			owner:RemoveEffect("Concussion")
 		end
-	end
-	
-	if GetConVar("cl_eftmeds_quick"):GetBool() and SERVER then -- End
-		timer.Simple(0.033, function()
-			if owner:GetAmmoCount(ID_PRIMARYAMMO) == 0 then owner:StripWeapon(ID_WEAPON) end
-			owner:SelectWeapon(owner:GetPreviousWeapon())
-		end)
-	else
+		
+		if INI_VIVO == true then 
+			math.Round(OJSWounds:HealHP(owner, self.MaxHeal, VarHealHealth), 0)
+			OJSWounds:HealPain(owner)
+			if (OJSWounds:HasStatusWholeBody(owner, "Bleed")) then
+				OJSWounds:HealBleed(owner)
+				owner:RemoveAmmo(40, ID_PRIMARYAMMO)    
+			end
+			if (OJSWounds:HasStatusWholeBody(owner, "Fractured")) then
+				OJSWounds:HealFracture(owner)
+				owner:RemoveAmmo(50, ID_PRIMARYAMMO)    
+			end
+		else
+			owner:SetHealth(math.min(owner:GetMaxHealth(), owner:Health() + VarHealHealth)) 
+		end
+		owner:RemoveAmmo(VarHealHealth, ID_PRIMARYAMMO) 
 		self:Deploy()
 	end
 end
@@ -122,7 +126,7 @@ function SWEP:PrimaryAttack()
 	if self.IniAnimBandage == 1 or self.IniAnimSyringe == 1 or self.IniAnimPills == 1 then return end
 	
 	local RndAnim = math.random(1,2)
-	if InitializeSEF == true and owner:HaveEffect("Bleeding") then
+	if InitializeSEF == true and owner:HaveEffect("Bleeding") or (INI_VIVO == true and (OJSWounds:HasStatusWholeBody(owner, "Bleed"))) then
 		self:SendWeaponAnim(ACT_VM_MISSRIGHT)
 		self.IniAnimBandage = 1
 	elseif RndAnim == 1 then
@@ -145,41 +149,43 @@ function SWEP:SecondaryAttack()
 end
 
 function SWEP:Think()
-	if self.IniHeal == 1 and self.IdleTimer <= CurTime() then -- Initialize Heal
-		self.IniAnimBandage = 0
-		self.IniAnimSyringe = 0
-		self.AnimTimes = 0
-		self.IniHeal = 0
-		self:Heal(owner)
-	end
-	
-	if self.IniAnimBandage == 1 and self.AnimTimes <= 2 and self.IdleTimer <= CurTime() then -- Bandage Sequence
-		self:SendWeaponAnim(ACT_VM_MISSRIGHT2)
-		self.IdleTimer = CurTime() + self.Owner:GetViewModel():SequenceDuration()
-		self.AnimTimes = self.AnimTimes + 1
-	elseif self.IniAnimBandage == 1 and self.AnimTimes == 3 and self.IdleTimer <= CurTime() then
-		self:SendWeaponAnim(ACT_VM_MISSCENTER2)
-		self.IdleTimer = CurTime() + self.Owner:GetViewModel():SequenceDuration()
-		self.IniHeal = 1
-	end
-	
-	if self.IniAnimSyringe == 1 and self.AnimTimes <= 0 and self.IdleTimer <= CurTime() then -- Syringe Sequence
-		self:SendWeaponAnim(ACT_VM_PULLBACK)
-		self.IdleTimer = CurTime() + self.Owner:GetViewModel():SequenceDuration()
-		self.AnimTimes = self.AnimTimes + 1
-	elseif self.IniAnimSyringe == 1 and self.AnimTimes == 1 and self.IdleTimer <= CurTime() then
-		self:SendWeaponAnim(ACT_VM_PICKUP)
-		self.IdleTimer = CurTime() + self.Owner:GetViewModel():SequenceDuration()
-		self.AnimTimes = self.AnimTimes + 1
-	elseif self.IniAnimSyringe == 1 and self.AnimTimes == 2 and self.IdleTimer <= CurTime() then
-		self:SendWeaponAnim(ACT_VM_PULLBACK)
-		self.IdleTimer = CurTime() + self.Owner:GetViewModel():SequenceDuration()
-		self.AnimTimes = self.AnimTimes + 1
-	elseif self.IniAnimSyringe == 1 and self.AnimTimes == 3 and self.IdleTimer <= CurTime() then
-		self:SendWeaponAnim(ACT_VM_PULLBACK_LOW)
-		self.IdleTimer = CurTime() + self.Owner:GetViewModel():SequenceDuration()
-		self.AnimTimes = self.AnimTimes + 1
-		self.IniHeal = 1
+	if SERVER then
+		if self.IniHeal == 1 and self.IdleTimer <= CurTime() then -- Initialize Heal
+			self.IniAnimBandage = 0
+			self.IniAnimSyringe = 0
+			self.AnimTimes = 0
+			self.IniHeal = 0
+			self:Heal(owner)
+		end
+		
+		if self.IniAnimBandage == 1 and self.AnimTimes <= 2 and self.IdleTimer <= CurTime() then -- Bandage Sequence
+			self:SendWeaponAnim(ACT_VM_MISSRIGHT2)
+			self.IdleTimer = CurTime() + self.Owner:GetViewModel():SequenceDuration()
+			self.AnimTimes = self.AnimTimes + 1
+		elseif self.IniAnimBandage == 1 and self.AnimTimes == 3 and self.IdleTimer <= CurTime() then
+			self:SendWeaponAnim(ACT_VM_MISSCENTER2)
+			self.IdleTimer = CurTime() + self.Owner:GetViewModel():SequenceDuration()
+			self.IniHeal = 1
+		end
+		
+		if self.IniAnimSyringe == 1 and self.AnimTimes <= 0 and self.IdleTimer <= CurTime() then -- Syringe Sequence
+			self:SendWeaponAnim(ACT_VM_PULLBACK)
+			self.IdleTimer = CurTime() + self.Owner:GetViewModel():SequenceDuration()
+			self.AnimTimes = self.AnimTimes + 1
+		elseif self.IniAnimSyringe == 1 and self.AnimTimes == 1 and self.IdleTimer <= CurTime() then
+			self:SendWeaponAnim(ACT_VM_PICKUP)
+			self.IdleTimer = CurTime() + self.Owner:GetViewModel():SequenceDuration()
+			self.AnimTimes = self.AnimTimes + 1
+		elseif self.IniAnimSyringe == 1 and self.AnimTimes == 2 and self.IdleTimer <= CurTime() then
+			self:SendWeaponAnim(ACT_VM_PULLBACK)
+			self.IdleTimer = CurTime() + self.Owner:GetViewModel():SequenceDuration()
+			self.AnimTimes = self.AnimTimes + 1
+		elseif self.IniAnimSyringe == 1 and self.AnimTimes == 3 and self.IdleTimer <= CurTime() then
+			self:SendWeaponAnim(ACT_VM_PULLBACK_LOW)
+			self.IdleTimer = CurTime() + self.Owner:GetViewModel():SequenceDuration()
+			self.AnimTimes = self.AnimTimes + 1
+			self.IniHeal = 1
+		end
 	end
 end
 

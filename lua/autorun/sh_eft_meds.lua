@@ -34,7 +34,9 @@ Convars
 -----------------------------------------------------------------------------------------------------
 ]]
 
-CreateClientConVar("cl_eftmeds_quick", "0", true, false)
+-- if CLIENT then
+	-- CreateClientConVar("cl_eftmeds_quick", "0", true, false)
+-- end
 
 --[[
 -----------------------------------------------------------------------------------------------------
@@ -87,8 +89,12 @@ name = "etg",
 game.AddAmmoType( {
 name = "tg12",
 } )
-
-
+game.AddAmmoType( {
+name = "anaglin",
+} )
+game.AddAmmoType( {
+name = "esmarch",
+} )
 
 --[[
 -----------------------------------------------------------------------------------------------------

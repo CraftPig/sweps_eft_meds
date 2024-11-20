@@ -76,9 +76,9 @@ function SWEP:Deploy()
         end
     end)
 	
-	if owner:GetAmmoCount(self.Primary.Ammo) == 0 then owner:StripWeapon(ID_WEAPON) end
-	if GetConVar("cl_eftmeds_quick"):GetBool() then
-		self:PrimaryAttack()
+	if owner:GetAmmoCount(self.Primary.Ammo) == 0 then 
+		owner:StripWeapon(ID_WEAPON)
+		owner:SelectWeapon(owner:GetPreviousWeapon())
 	end
 	return true
 end
@@ -98,14 +98,6 @@ function SWEP:Heal(owner)
 			owner:RemoveAmmo(1, ID_PRIMARYAMMO)  
 			
 		end
-	end
-	
-	if GetConVar("cl_eftmeds_quick"):GetBool() and SERVER then -- End
-		timer.Simple(0.033, function()
-			if owner:GetAmmoCount(ID_PRIMARYAMMO) == 0 then owner:StripWeapon(ID_WEAPON) end
-			owner:SelectWeapon(owner:GetPreviousWeapon())
-		end)
-	else
 		self:Deploy()
 	end
 end

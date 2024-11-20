@@ -17,7 +17,7 @@ SWEP.Category2 = "Drugs"
 
 SWEP.ViewModelFOV = 85
 SWEP.ViewModel = "models/weapons/sweps/eft/augmentin/v_meds_augmentin.mdl"
-SWEP.WorldModel = "models/weapons/sweps/eft/cat/w_meds_cat.mdl"
+SWEP.WorldModel = "models/weapons/sweps/eft/augmentin/w_meds_augmentin.mdl"
 SWEP.UseHands = true
 SWEP.DrawCrosshair = false 
 
@@ -42,6 +42,7 @@ SWEP.Secondary.Automatic = false
 SWEP.MaxHeal = 0
 
 local INI_SEF = false
+local INI_VIVO = false
 local ID_WEAPON = "weapon_eft_augmentin"
 local ID_PRIMARYAMMO = "augmentin"
 
@@ -51,8 +52,11 @@ function SWEP:Initialize()
 	local FilePathSEF = "lua/SEF/SEF_Functions.lua"
     if file.Exists(FilePathSEF, "GAME") then
         INI_SEF = true
-    else
-        INI_SEF = false
+    end
+	
+	local FilePathVIVO = "lua/autorun/ojsshared.lua"
+    if file.Exists(FilePathVIVO, "GAME") then
+        INI_VIVO = true
     end
 end 
 
@@ -65,33 +69,34 @@ function SWEP:Deploy()
 	
 	self:SendWeaponAnim(ACT_VM_IDLE)
 	
-	if owner:GetAmmoCount(self.Primary.Ammo) == 0 then owner:StripWeapon(ID_WEAPON) end
-	if GetConVar("cl_eftmeds_quick"):GetBool() then
-		self:PrimaryAttack()
+	if owner:GetAmmoCount(self.Primary.Ammo) == 0 then 
+		owner:StripWeapon(ID_WEAPON)
+		owner:SelectWeapon(owner:GetPreviousWeapon())
 	end
 	return true
 end
 
 function SWEP:Heal(owner)
 	local owner = self:GetOwner() 
+	local VarMissingHealth = owner:GetMaxHealth() - owner:Health()
+	local VarGetHealth = math.min(VarMissingHealth, owner:GetAmmoCount(ID_PRIMARYAMMO))
+	local VarHealHealth = math.min(VarGetHealth, self.MaxHeal) 
 	
-	if IsValid(self) then
-		if IsValid(owner) and SERVER and owner:GetActiveWeapon():GetClass() == ID_WEAPON then -- Heal logic
-			if INI_SEF == true then
+	if IsValid(owner) and SERVER and owner:GetActiveWeapon():GetClass() == ID_WEAPON then
+		if INI_SEF == true then
 				owner:ApplyEffect("Tenacity", 155, 20)
+				owner:ApplyEffect("OnPainkillers", 155)
 				owner:RemoveEffect("DarkVision")
-			end
-			
-			owner:RemoveAmmo(1, ID_PRIMARYAMMO)  
 		end
-	end
-	
-	if GetConVar("cl_eftmeds_quick"):GetBool() and SERVER then -- End
-		timer.Simple(0.033, function()
-			if owner:GetAmmoCount(ID_PRIMARYAMMO) == 0 then owner:StripWeapon(ID_WEAPON) end
-			owner:SelectWeapon(owner:GetPreviousWeapon())
-		end)
-	else
+		if INI_VIVO == true then 
+			OJSWounds:AddStatus(owner,"Head","Painkillers", 155, 1)
+			for i=1,7 do
+				OJSWounds:HealPain(owner)
+			end
+		else
+			owner:SetHealth(math.min(owner:GetMaxHealth(), owner:Health() + VarHealHealth)) 
+		end
+		owner:RemoveAmmo(1, ID_PRIMARYAMMO) 
 		self:Deploy()
 	end
 end

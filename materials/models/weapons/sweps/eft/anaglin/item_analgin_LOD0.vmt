@@ -1,8 +1,8 @@
 "VertexLitGeneric"
 {
-    "$basetexture" "models/weapons/sweps/eft/analgin/item_analgin_LOD0_rgb"
-    "$bumpmap" "models/weapons/sweps/eft/analgin/item_analgin_LOD0_n"
-    "$phongexponenttexture" "models/weapons/sweps/eft/analgin/item_analgin_LOD0_e"
+    "$basetexture" "models/weapons/sweps/eft/anaglin/item_analgin_LOD0_rgb"
+    "$bumpmap" "models/weapons/sweps/eft/anaglin/item_analgin_LOD0_n"
+    "$phongexponenttexture" "models/weapons/sweps/eft/anaglin/item_analgin_LOD0_e"
 
     //----------------------------------------------------------------------------------------------
     "$color2" "[0 0 0]"                                     //do not touch this
